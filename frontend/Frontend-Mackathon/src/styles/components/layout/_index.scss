@@ -1,0 +1,24 @@
+/* bundelt alleen layout styles */
+@forward "header";
+@forward "sidebar";
+@forward "content";
+@forward "dashboard";
+@forward "map";
+@forward "containerdetailpage";
+@forward "logspage";
+/* app-grid container klasses hier, zodat layout samenkomt */
+.layout {
+  display: grid;
+  grid-template-areas:
+    "header"
+    "content";
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 240px 1fr;
+    grid-template-areas:
+      "sidebar header"
+      "sidebar content";
+  }
+}

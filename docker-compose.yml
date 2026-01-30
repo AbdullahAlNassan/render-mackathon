@@ -1,0 +1,94 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mackathon
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mackathon"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+      DOCKER_INFLUXDB_INIT_ORG: mackathon
+      DOCKER_INFLUXDB_INIT_BUCKET: sensors
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: mackathon-dev-token
+    volumes:
+      - influx-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD-SHELL", "influx ping --host http://localhost:8086 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfiles/backend.Dockerfile
+    environment:
+      PORT: "3000"
+      NODE_ENV: development
+      ALLOW_REGISTER: "true"
+      JWT_SECRET: dev-secret
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/mackathon?schema=public
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: mackathon-dev-token
+      INFLUX_ORG: mackathon
+      INFLUX_BUCKET: sensors
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+      - "5555:5555"
+    depends_on:
+      db:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./Backend:/src
+      - backend-node-modules:/src/node_modules
+    command:
+      [
+        "sh",
+        "-c",
+        "npx prisma generate && npx prisma migrate deploy && npm run dev"
+      ]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: dockerfiles/frontend.Dockerfile
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      # Use same-origin API (works behind a single tunnel); Vite proxies /api -> backend.
+      VITE_API_URL: /api/v1
+      VITE_DEV_PROXY_TARGET: http://backend:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/Frontend-Mackathon:/app
+      - frontend-node-modules:/app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+volumes:
+  db-data:
+  influx-data:
+  backend-node-modules:
+  frontend-node-modules:
+
+

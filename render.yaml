@@ -1,0 +1,54 @@
+databases:
+  - name: mackathon-db
+    plan: free
+
+services:
+  # Backend API (Docker)
+  - type: web
+    name: mackathon-backend
+    runtime: docker
+    dockerfilePath: dockerfiles/backend.render.Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOW_REGISTER
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mackathon-db
+          property: connectionString
+      # Optional (recommended): use InfluxDB Cloud or another hosted InfluxDB
+      - key: INFLUX_URL
+        value: ""
+      - key: INFLUX_TOKEN
+        value: ""
+      - key: INFLUX_ORG
+        value: ""
+      - key: INFLUX_BUCKET
+        value: ""
+
+  # Frontend (Static Site)
+  - type: static
+    name: mackathon-frontend
+    rootDir: frontend/Frontend-Mackathon
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    envVars:
+      # After the backend is created, set this in Render UI to:
+      # https://<your-backend-host>/api/v1
+      - key: VITE_API_URL
+        value: /api/v1
+    routes:
+      # React Router SPA fallback
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+

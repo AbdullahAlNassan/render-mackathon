@@ -1,0 +1,23 @@
+# Node
+**/node_modules/
+**/dist/
+**/.cache/
+**/.eslintcache
+
+# Env / secrets
+**/.env
+**/.env.*
+
+# Logs
+**/*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Prisma (keep schema + migrations)
+# (no ignores here on purpose)
+
+

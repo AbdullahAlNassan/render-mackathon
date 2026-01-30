@@ -1,0 +1,62 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  userTokens UserToken[] // één user → meerdere tokens
+}
+
+model UserToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_token") // tabelnaam in de DB
+}
+
+model Device {
+  id       String   @id
+  lastSeen DateTime
+
+  alert  DeviceAlert?
+  events DeviceAlertEvent[]
+}
+
+model DeviceAlert {
+  deviceId  String   @id
+  level     String
+  reasons   Json
+  updatedAt DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_alert")
+}
+
+model DeviceAlertEvent {
+  id        String   @id @default(uuid())
+  deviceId  String
+  level     String
+  reasons   Json
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, createdAt])
+  @@map("device_alert_event")
+}

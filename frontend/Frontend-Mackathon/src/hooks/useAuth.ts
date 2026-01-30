@@ -1,0 +1,212 @@
+import { useState, useCallback, useEffect, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCodeInput } from "./useCodeInput";
+import type { User } from "../types/auth";
+import { authApi } from "../services/api";
+
+type AuthStep =
+  | "credentials"
+  | "emailCode"
+  | "totpCode"
+  | "totpSetup"
+  | "success";
+
+type AuthErrors = {
+  email?: string;
+  password?: string;
+  general?: string;
+  code?: string;
+};
+
+const createUser = (email: string): User => ({
+  id: `user-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 6)}`,
+  username: email,
+  role: "user",
+  email,
+});
+
+export const useAuth = () => {
+  const navigate = useNavigate();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<AuthStep>("credentials");
+  const [errors, setErrors] = useState<AuthErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  const {
+    code,
+    isCodeComplete,
+    setInputRef,
+    handleCodeChange,
+    handleKeyDown,
+    handlePaste,
+    handleFocus,
+    resetCode,
+  } = useCodeInput({
+    length: 6,
+    autoFocus: step === "emailCode" || step === "totpCode",
+  });
+
+  const completeLogin = useCallback(
+    (accountEmail: string) => {
+      const nextUser = createUser(accountEmail);
+      setUser(nextUser);
+      setStep("success");
+
+      setTimeout(() => {
+        navigate("/dashboard", { state: { user: nextUser } });
+      }, 600);
+    },
+    [navigate]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+      setUser(null);
+      navigate("/inloggen");
+    } catch (error) {
+      console.error("Logout mislukt", error);
+    }
+  }, [navigate]);
+
+  const submitCredentials = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+
+      // Validatie (bestaande code)
+      const nextErrors: AuthErrors = {};
+      if (!email.trim()) nextErrors.email = "E-mail is verplicht";
+      if (!password.trim()) nextErrors.password = "Wachtwoord is verplicht";
+
+      if (Object.keys(nextErrors).length) {
+        setErrors(nextErrors);
+        return;
+      }
+
+      setErrors({});
+      setIsLoading(true);
+
+      try {
+        const response = await authApi.login(email, password);
+
+        // backend response:
+        // { message, data: { accessToken, user } }
+        const { accessToken, user } = response.data;
+
+        // ✅ juiste key gebruiken (zoals logout verwacht)
+        localStorage.setItem("accessToken", accessToken);
+
+        // user opslaan in state
+        setUser(user);
+
+        // login klaar
+        setStep("success");
+        setTimeout(() => navigate("/dashboard"), 600);
+      } catch (error) {
+        // Toon foutmelding als login mislukt
+        setErrors({
+          general: error instanceof Error ? error.message : "Login mislukt",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [email, password, navigate]
+  );
+
+  const submitCode = useCallback(
+    (value?: string) => {
+      if (step !== "emailCode" && step !== "totpCode") {
+        return;
+      }
+
+      const fullCode = value ?? code.join("");
+
+      if (fullCode.length !== 6) {
+        setErrors((prev) => ({ ...prev, code: "Voer alle zes cijfers in" }));
+        return;
+      }
+
+      setIsLoading(true);
+      setErrors((prev) => ({ ...prev, code: undefined }));
+
+      setTimeout(() => {
+        setIsLoading(false);
+
+        if (fullCode === "000000") {
+          setErrors((prev) => ({ ...prev, code: "Deze code is ongeldig" }));
+          resetCode();
+          return;
+        }
+
+        completeLogin(email);
+      }, 800);
+    },
+    [code, completeLogin, email, resetCode, step]
+  );
+
+  useEffect(() => {
+    if (isCodeComplete && (step === "emailCode" || step === "totpCode")) {
+      submitCode();
+    }
+  }, [isCodeComplete, step, submitCode]);
+
+  const resendCode = useCallback(() => {
+    if (step !== "emailCode") {
+      return Promise.resolve();
+    }
+
+    setIsResending(true);
+    setErrors((prev) => ({ ...prev, code: undefined }));
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        setIsResending(false);
+        resetCode();
+        resolve();
+      }, 600);
+    });
+  }, [resetCode, step]);
+
+  const startTotpEntry = useCallback(() => {
+    setStep("totpCode");
+    setErrors({});
+    resetCode();
+  }, [resetCode]);
+
+  const skipTotpSetup = useCallback(() => {
+    setStep("credentials");
+    setErrors({});
+  }, []);
+
+  return {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    code,
+    errors,
+    step,
+    isLoading,
+    isResending,
+    user,
+    isCodeComplete,
+    setInputRef,
+    handleCodeChange,
+    handleKeyDown,
+    handlePaste,
+    handleFocus,
+    submitCredentials,
+    submitCode,
+    resendCode,
+    startTotpEntry,
+    skipTotpSetup,
+    logout,
+  };
+};

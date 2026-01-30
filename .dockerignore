@@ -1,0 +1,26 @@
+# General
+.git
+.github
+.vscode
+.idea
+**/*.log
+**/.DS_Store
+
+# Node / TS build artifacts
+**/node_modules
+**/dist
+**/.turbo
+**/.cache
+**/.eslintcache
+
+# Environment / secrets
+**/.env
+**/.env.*
+
+# Frontend build output
+frontend/Frontend-Mackathon/dist
+
+# Prisma
+Backend/prisma/migrations/**/.DS_Store
+
+
