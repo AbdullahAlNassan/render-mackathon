@@ -11,6 +11,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY Backend/ ./
 
+# Generate Prisma client for runtime
+RUN npx prisma generate
+
 # Build TypeScript -> dist
 RUN npm run build
 
@@ -31,6 +34,7 @@ COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 EXPOSE 3000
 
 # Render sets PORT; our app reads it from env.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Run generate at runtime to avoid missing client in Render cache layers.
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/server.js"]
 
 
