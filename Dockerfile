@@ -11,9 +11,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY Backend/ ./
 
-# Generate Prisma client for runtime
-RUN npx prisma generate
-
 # Build TypeScript -> dist
 RUN npm run build
 
