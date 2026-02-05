@@ -12,6 +12,14 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.get("/", (_req, res) => {
+  res.json({
+    status: "ok",
+    message: "Backend is running. Use /api/v1/* for API routes.",
+  });
+});
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/sensor", sensorRoutes);
 app.use("/api/v1/devices", deviceRoutes);
