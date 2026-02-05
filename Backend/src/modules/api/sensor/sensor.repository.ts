@@ -1,4 +1,5 @@
 import {
+  influxEnabled,
   writeApi,
   makeSensorPoint,
   queryApi,
@@ -14,12 +15,18 @@ const RANGE: Record<"1h" | "24h" | "7d", string> = {
 
 export const SensorRepository = {
   async writeReading(dto: SensorIngestDto) {
+    if (!influxEnabled) {
+      return true;
+    }
     writeApi.writePoint(makeSensorPoint(dto));
     await writeApi.flush();
     return true;
   },
 
   async getSeries(opts: { deviceId: string; range: "1h" | "24h" | "7d" }) {
+    if (!influxEnabled) {
+      return [];
+    }
     const flux = `
 from(bucket: "${env.influxBucket}")
   |> range(start: ${RANGE[opts.range]})
