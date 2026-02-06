@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { authApi } from "../services/api";
 
 const LOGIN_PATH = "/inloggen";
@@ -9,17 +9,39 @@ export default function ProtectedRoute({
 }: {
   children: React.ReactNode;
 }) {
+  const location = useLocation();
+  const token = localStorage.getItem("accessToken");
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    authApi
-      .me()
-      .then(() => setAllowed(true))
-      .catch(() => setAllowed(false));
-  }, []);
+    if (!token) return;
 
+    authApi.me().then(
+      () => setAllowed(true),
+      () => setAllowed(false)
+    );
+  }, [token]);
+
+  if (!token) {
+    return (
+      <Navigate
+        to={LOGIN_PATH}
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
+  }
   if (allowed === null) return <div>Loading...</div>;
-  if (allowed === false) return <Navigate to={LOGIN_PATH} replace />;
+  if (allowed === false) {
+    localStorage.removeItem("accessToken");
+    return (
+      <Navigate
+        to={LOGIN_PATH}
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
+  }
 
   return children;
 }
